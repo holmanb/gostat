@@ -6,6 +6,26 @@ import (
 	"time"
 	)
 
+func get_disk_space() string {
+	return "FULL"
+}
+
+/*
+to implement
+============
+resources:
+memory /proc/meminfo
+cpu util
+storage space
+
+temperature:
+by drive
+battery
+
+
+*/
+
+
 func main(){
 	d := Display{}
 	d.XOpenDisplay()
@@ -29,7 +49,10 @@ func main(){
 			}
 		}(c)
 		for {
-			c <- time.Now().Format(time.RFC1123)
+			t := time.Now().Format(time.RFC1123)
+			d := get_disk_space()
+			s := fmt.Sprintf("[Disk : %s]  %s",d, t)
+			c <- s
 			time.Sleep(time.Second)
 		}
 	}
