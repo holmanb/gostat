@@ -4,13 +4,12 @@ import (
 	"fmt"
 	"os"
 	"time"
-	"sync"
 	)
 
-func get_disk_space(s chan string, wg *sync.WaitGroup){
+func get_disk_space(s chan string){
 	s <- "FULL"
 }
-func get_time(s chan string, wg *sync.WaitGroup){
+func get_time(s chan string){
 	s <- time.Now().Format(time.RFC1123)
 }
 
@@ -25,8 +24,6 @@ storage space
 temperature:
 by drive
 battery
-
-
 */
 
 
@@ -49,16 +46,14 @@ func main(){
 		c := make(chan string)
 		tm := make(chan string)
 		ds := make(chan string)
-		var wg sync.WaitGroup
 		go func(c chan string) {
 			for i := range c{
 				d.Update(i)
 			}
 		}(c)
 		for {
-			wg.Add(1)
-			go get_time(tm, &wg)
-			go get_disk_space(ds,&wg)
+			go get_time(tm)
+			go get_disk_space(ds)
 
 			s := fmt.Sprintf("[Disk : %s]  %s",<-ds, <-tm)
 			c <- s
