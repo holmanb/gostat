@@ -4,10 +4,14 @@ import (
 	"fmt"
 	"os"
 	"time"
+	"sync"
 	)
 
-func get_disk_space() string {
-	return "FULL"
+func get_disk_space(s chan string, wg *sync.WaitGroup){
+	s <- "FULL"
+}
+func get_time(s chan string, wg *sync.WaitGroup){
+	s <- time.Now().Format(time.RFC1123)
 }
 
 /*
@@ -41,17 +45,22 @@ func main(){
 		s := os.Args[1]
 		d.Update(s)
 	} else {
-		fmt.Println("running buildin update loop")
+		fmt.Println("running update loop")
 		c := make(chan string)
+		tm := make(chan string)
+		ds := make(chan string)
+		var wg sync.WaitGroup
 		go func(c chan string) {
 			for i := range c{
 				d.Update(i)
 			}
 		}(c)
 		for {
-			t := time.Now().Format(time.RFC1123)
-			d := get_disk_space()
-			s := fmt.Sprintf("[Disk : %s]  %s",d, t)
+			wg.Add(1)
+			go get_time(tm, &wg)
+			go get_disk_space(ds,&wg)
+
+			s := fmt.Sprintf("[Disk : %s]  %s",<-ds, <-tm)
 			c <- s
 			time.Sleep(time.Second)
 		}
