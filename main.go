@@ -32,9 +32,10 @@ func loop(d *Display){
 	c := make(chan string)
 	tm := make(chan string)
 	ds := make(chan string)
-	ps := make(chan string)
+	psi_cpu := make(chan string)
+	psi_mem := make(chan string)
+	psi_io := make(chan string)
 	psi.Psi_init()
-	defer psi.Psi_close()
 	go func(c chan string) {
 		for i := range c{
 			d.Update(i)
@@ -43,8 +44,8 @@ func loop(d *Display){
 	for {
 		go get_time(tm)
 		go get_disk_space(ds)
-		go psi.Get_psi(ps)
-		s := fmt.Sprintf("[PSI]: cpu:%s | Disk : %s | %s",<-ps, <-ds, <-tm)
+		go psi.Get_psi(psi_cpu, psi_mem, psi_io)
+		s := fmt.Sprintf("Pressure Stats cpu:%6s mem:%6s io:%6s | Disk : %s | %s", <-psi_cpu, <-psi_mem, <-psi_io, <-ds, <-tm)
 		c <- s
 		time.Sleep(time.Second)
 	}

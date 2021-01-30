@@ -1,12 +1,10 @@
 package main
 
 import (
-	"bufio"
-	"fmt"
-	"os"
 	"log"
 	"regexp"
 	"strconv"
+	"io/ioutil"
 )
 
 type some struct {
@@ -17,8 +15,6 @@ type some struct {
 type full struct {
 	path string
 	last_total uint64
-	f *os.File
-	s *bufio.Scanner
 	rex_total regexp.Regexp
 }
 
@@ -29,23 +25,17 @@ type resource interface {
 type cpu struct {
 	path string
 	some some
-	f *os.File
-	s *bufio.Scanner
 }
 
 type mem struct {
 	path string
 	some some
 	full full
-	f *os.File
-	s *bufio.Scanner
 }
 type io struct {
+	path string
 	some some
 	full full
-	path string
-	f *os.File
-	s *bufio.Scanner
 }
 
 type Psi struct {
@@ -57,8 +47,21 @@ type Psi struct {
 func (c *cpu) SubStr(s string)string{
 	match := c.some.rex_total.FindStringSubmatch(s)
 	if !(len(match) == 2){
-		fmt.Printf("WARN: parsing error found length: %s in string %s", len(match),s)
-		return ""
+		log.Fatalf("WARN: cpu parsing error found length: %s for string %s", len(match),s)
+	}
+	return match[1]
+}
+func (m *mem) SubStr(s string)string{
+	match := m.some.rex_total.FindStringSubmatch(s)
+	if !(len(match) == 2){
+		log.Fatalf("WARN: mem parsing error found length: %s for string %s", len(match),s)
+	}
+	return match[1]
+}
+func (i *io) SubStr(s string)string{
+	match := i.some.rex_total.FindStringSubmatch(s)
+	if !(len(match) == 2){
+		log.Fatalf("WARN: io parsing error found length: %s for string %s", len(match),s)
 	}
 	return match[1]
 }
@@ -71,14 +74,23 @@ func (c *cpu) cpu_init(rex_total regexp.Regexp, path string){
 	} else {
 		c.path = path
 	}
+}
 
-
-	file, err := os.Open(c.path)
-	if err != nil {
-		log.Fatal(err)
+func (m *mem) mem_init(rex_total regexp.Regexp, path string){
+	m.some.rex_total = rex_total
+	if path == "" {
+		m.path = "/proc/pressure/memory"
+	} else {
+		m.path = path
 	}
-	c.f = file
-	c.s = bufio.NewScanner(file)
+}
+func (i *io) io_init(rex_total regexp.Regexp, path string){
+	i.some.rex_total = rex_total
+	if path == "" {
+		i.path = "/proc/pressure/io"
+	} else {
+		i.path = path
+	}
 }
 
 /*
@@ -89,19 +101,18 @@ func extractInt(s string,r resource)uint64 {
 	match := r.SubStr(s)
 	i, err := strconv.ParseUint(match, 10, 64)
 	if err != nil {
-		fmt.Println("WARN: parsing error in ParseUint()", err)
+		log.Fatal("WARN: parsing error", err)
 	}
 	return i
 }
 
 func (c *cpu) cpu_read() string{
 	var diff uint64
-	_, err := c.f.Seek(0, os.SEEK_SET)
+	b, err := ioutil.ReadFile(c.path)
 	if err != nil {
 		log.Fatal(err)
 	}
-	c.s.Scan()
-	str := c.s.Text()
+	str := string(b)
 	curr_total := extractInt(str,c)
 
 	// report a sane initial value
@@ -113,20 +124,54 @@ func (c *cpu) cpu_read() string{
 	c.some.last_total = curr_total
 	return strconv.FormatUint(diff, 10)
 }
+func (m *mem) mem_read() string{
+	var diff uint64
+	b, err := ioutil.ReadFile(m.path)
+	if err != nil {
+		log.Fatal(err)
+	}
+	str := string(b)
+	curr_total := extractInt(str,m)
 
-func (c *cpu) cpu_free(){
-	c.f.Close()
+	// report a sane initial value
+	if m.some.last_total == 0 {
+		diff = 0
+	} else{
+		diff = curr_total - m.some.last_total
+	}
+	m.some.last_total = curr_total
+	return strconv.FormatUint(diff, 10)
 }
+func (i *io) io_read() string{
+	var diff uint64
+	b, err := ioutil.ReadFile(i.path)
+	if err != nil {
+		log.Fatal(err)
+	}
+	str := string(b)
+	curr_total := extractInt(str,i)
+
+	// report a sane initial value
+	if i.some.last_total == 0 {
+		diff = 0
+	} else{
+		diff = curr_total - i.some.last_total
+	}
+	i.some.last_total = curr_total
+	return strconv.FormatUint(diff, 10)
+}
+
 
 
 func (p *Psi) Psi_init() {
-	rex_total := regexp.MustCompile("total=(\\d+)$")
+	rex_total := regexp.MustCompile("total=(\\d+)\\n$")
 	p.c.cpu_init(*rex_total, "")
+	p.m.mem_init(*rex_total, "")
+	p.i.io_init(*rex_total, "")
 }
-func (p *Psi) Get_psi(c chan string){
+func (p *Psi) Get_psi(c,m,i chan string){
 	c <- p.c.cpu_read()
+	m <- p.m.mem_read()
+	i <- p.i.io_read()
 }
 
-func (p *Psi) Psi_close() {
-	p.c.cpu_free()
-}
