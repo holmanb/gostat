@@ -26,6 +26,24 @@ by drive
 battery
 */
 
+func loop(d *Display){
+	fmt.Println("running update loop")
+	c := make(chan string)
+	tm := make(chan string)
+	ds := make(chan string)
+	go func(c chan string) {
+		for i := range c{
+			d.Update(i)
+		}
+	}(c)
+	for {
+		go get_time(tm)
+		go get_disk_space(ds)
+		s := fmt.Sprintf("cpu:%s | Disk : %s | %s", <-ds, <-tm)
+		c <- s
+		time.Sleep(time.Second)
+	}
+}
 
 func main(){
 	d := Display{}
@@ -42,22 +60,6 @@ func main(){
 		s := os.Args[1]
 		d.Update(s)
 	} else {
-		fmt.Println("running update loop")
-		c := make(chan string)
-		tm := make(chan string)
-		ds := make(chan string)
-		go func(c chan string) {
-			for i := range c{
-				d.Update(i)
-			}
-		}(c)
-		for {
-			go get_time(tm)
-			go get_disk_space(ds)
-
-			s := fmt.Sprintf("[Disk : %s]  %s",<-ds, <-tm)
-			c <- s
-			time.Sleep(time.Second)
-		}
+		loop(&d)
 	}
 }
