@@ -28,9 +28,13 @@ battery
 
 func loop(d *Display){
 	fmt.Println("running update loop")
+	psi := Psi {}
 	c := make(chan string)
 	tm := make(chan string)
 	ds := make(chan string)
+	ps := make(chan string)
+	psi.Psi_init()
+	defer psi.Psi_close()
 	go func(c chan string) {
 		for i := range c{
 			d.Update(i)
@@ -39,7 +43,8 @@ func loop(d *Display){
 	for {
 		go get_time(tm)
 		go get_disk_space(ds)
-		s := fmt.Sprintf("cpu:%s | Disk : %s | %s", <-ds, <-tm)
+		go psi.Get_psi(ps)
+		s := fmt.Sprintf("[PSI]: cpu:%s | Disk : %s | %s",<-ps, <-ds, <-tm)
 		c <- s
 		time.Sleep(time.Second)
 	}
