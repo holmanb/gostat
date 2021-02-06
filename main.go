@@ -37,8 +37,13 @@ func loop(d *Display){
 	psi_io := make(chan string)
 	psi.Psi_init()
 	go func(c chan string) {
+		debug := true
 		for i := range c{
-			d.Update(i)
+			if debug {
+				fmt.Println(i)
+			} else {
+				d.Update(i)
+			}
 		}
 	}(c)
 	for {
