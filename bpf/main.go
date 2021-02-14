@@ -1,4 +1,6 @@
 package main
+
+// based on bcc/cachestat.py
 import (
 	"os"
 	"fmt"
@@ -29,7 +31,31 @@ type key_t struct {
     ip uint64
 }
 
+func max(a,b uint64) uint64 {
+	if (a < b) {
+		 return b
+	}
+	return a
+}
+
+func get_counters(table *bpf.Table,kmap *map[string]uint64) {
+	it := table.Iter()
+	for ;it.Next(); {
+		kInt := bpf.GetHostByteOrder().Uint64(it.Leaf())
+
+		// fixme: this ugly hack shouldn't be necessary (bug in the lib??)
+		// https://github.com/iovisor/gobpf/issues/273
+		strval := strconv.FormatUint(bpf.GetHostByteOrder().Uint64(it.Key())-1, 16)
+		kname, err := ksym.Ksym(strval)
+		if err != nil {
+			panic(err)
+		}
+		(*kmap)[kname] = max(0,kInt)
+	}
+}
+
 func main(){
+	debug := false
 	kmap := map[string]uint64{
 		"add_to_page_cache_lru":0,
 		"mark_buffer_dirty":0,
@@ -52,35 +78,60 @@ func main(){
 			os.Exit(1)
 		}
 	}
+
+	fmt.Printf("%24v%24v%24v\n", "HITS", "MISSES", "RATIO")
+	if debug {
+		fmt.Printf("%24v%24v%24v%24v%24v%24v%24v%24v\n",
+			"mpa",
+			"mbd",
+			"apcl",
+			"apd",
+			"total",
+			"misses",
+			"hits",
+			"ratio")
+	}
 	table := bpf.NewTable(m.TableId("counts"), m)
 
-	fmt.Printf("%24v","add_to_page_cache_lru")
-	fmt.Printf("%24v","mark_buffer_dirty")
-	fmt.Printf("%24v","account_page_dirtied")
-	fmt.Printf("%24v\n","mark_page_accessed")
-	init := true
 	for {
-		it := table.Iter()
-		for ;it.Next(); {
-		        kInt := bpf.GetHostByteOrder().Uint64(it.Leaf())
-			if err != nil {
-				panic(err)
-			}
-		        strval := strconv.FormatUint(bpf.GetHostByteOrder().Uint64(it.Key())-1, 16)
-			kname, err := ksym.Ksym(strval)
-			if err != nil {
-				panic(err)
-			}
-			kmap[kname] = kInt
+		hits := float64(0)
+		misses := uint64(0)
+		total := uint64(0)
+		ratio := float64(0)
+		get_counters(table, &kmap)
+		if kmap["mark_page_accessed"] > kmap["mark_buffer_dirty"]{
+			total = kmap["mark_page_accessed"] - kmap["mark_buffer_dirty"]
 		}
-		// don't print unchanged values
-		if ! init {
-			fmt.Printf("%24v",kmap["add_to_page_cache_lru"])
-			fmt.Printf("%24v",kmap["mark_buffer_dirty"])
-			fmt.Printf("%24v",kmap["account_page_dirtied"])
-			fmt.Printf("%24v\n",kmap["mark_page_accessed"])
+		if kmap["add_to_page_cache_lru"] > kmap["account_page_dirtied"] {
+			misses = kmap["add_to_page_cache_lru"] - kmap["account_page_dirtied"]
 		}
-		init = false
+
+		hits = float64(total - misses)
+		if hits < 0 {
+			misses = total
+			hits = 0
+		}
+		if total > 0 {
+			ratio = hits / float64(total)
+		}
+
+		if debug {
+			fmt.Printf("%24v%24v%24v%24v%24v%24v%24v%24v\n",
+				kmap["mark_page_accessed"],
+				kmap["mark_buffer_dirty"],
+				kmap["add_to_page_cache_lru"],
+				kmap["account_page_dirtied"],
+				total, misses, hits,ratio*100)
+		} else {
+			fmt.Printf("%24v%24v%24v\n", hits, misses, fmt.Sprintf("%.1f",ratio * 100))
+		}
+
+		for k,_ := range kmap {
+			kmap[k] = 0
+		}
+		// clear counters
+		table.DeleteAll()
+
 		time.Sleep(time.Second)
 	}
 }
