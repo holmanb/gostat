@@ -1,4 +1,4 @@
-package main
+package bpf
 
 // based on bcc/cachestat.py
 import (
@@ -143,4 +143,3 @@ func max(a,b uint64) uint64 {
 	}
 	return a
 }
-
