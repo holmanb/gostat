@@ -4,11 +4,9 @@ import (
 	"fmt"
 	"os"
 	"time"
+	"github.com/holmanb/gostat/bpf"
 	)
 
-func get_disk_space(s chan string){
-	s <- "FULL"
-}
 func get_time(s chan string){
 	s <- time.Now().Format(time.RFC1123)
 }
@@ -29,13 +27,15 @@ battery
 func loop(d *Display){
 	fmt.Println("running update loop")
 	psi := Psi {}
+	bpf_cache := bpf.CacheHit {}
 	c := make(chan string)
 	tm := make(chan string)
-	ds := make(chan string)
+	ch := make(chan string)
 	psi_cpu := make(chan string)
 	psi_mem := make(chan string)
 	psi_io := make(chan string)
 	psi.Psi_init()
+	bpf_cache.Init()
 	go func(c chan string) {
 		debug := true
 		for i := range c{
@@ -48,10 +48,9 @@ func loop(d *Display){
 	}(c)
 	for {
 		go get_time(tm)
-		go get_disk_space(ds)
 		go psi.Get_psi(psi_cpu, psi_mem, psi_io)
-		s := fmt.Sprintf("Pressure Stats cpu:%6s mem:%6s io:%6s | Disk : %s | %s", <-psi_cpu, <-psi_mem, <-psi_io, <-ds, <-tm)
-		c <- s
+		go bpf_cache.Update(ch)
+		c <- fmt.Sprintf("Page Cache %5v |Pressure Stats cpu:%6s mem:%6s io:%6s | %s",<-ch, <-psi_cpu, <-psi_mem, <-psi_io, <-tm)
 		time.Sleep(time.Second)
 	}
 }
