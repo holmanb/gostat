@@ -7,9 +7,52 @@ import (
 	"github.com/holmanb/gostat/bpf"
 	)
 
-func get_time(s chan string){
-	s <- time.Now().Format(time.RFC1123)
+type Resource interface {
+	Init()
+	Update(s chan string)
+	Close()
 }
+
+type resource struct {
+	Resource
+	c chan string
+	format string
+	enabled bool
+}
+
+var resources = []resource {
+	resource {
+		enabled: true,
+		format: "Cache Hit Rate %4v ",
+		Resource: &bpf.CacheHit{},
+		c: make(chan string),
+	},
+	resource {
+		enabled: true,
+		format: "| Mem: %4v ",
+		Resource: &Mem{},
+		c: make(chan string),
+	},
+	resource {
+		enabled: true,
+		format: "Cpu: %4v ",
+		Resource: &Cpu{},
+		c: make(chan string),
+	},
+	resource {
+		enabled: true,
+		format: "Io: %4v ",
+		Resource: &Io{},
+		c: make(chan string),
+	},
+	resource {
+		enabled: true,
+		format: "| %v ",
+		Resource: &Time{},
+		c: make(chan string),
+	},
+}
+
 
 /*
 to implement
@@ -26,19 +69,15 @@ battery
 
 func loop(d *Display){
 	fmt.Println("running update loop")
-	psi := Psi {}
-	bpf_cache := bpf.CacheHit {}
+	var output string
 	c := make(chan string)
-	tm := make(chan string)
-	ch := make(chan string)
-	psi_cpu := make(chan string)
-	psi_mem := make(chan string)
-	psi_io := make(chan string)
-	psi.Psi_init()
-	bpf_cache.Init()
+
+	for _,resource := range resources {
+		resource.Init()
+	}
 	go func(c chan string) {
-		debug := true
-		for i := range c{
+		debug := false
+		for i := range c {
 			if debug {
 				fmt.Println(i)
 			} else {
@@ -47,10 +86,14 @@ func loop(d *Display){
 		}
 	}(c)
 	for {
-		go get_time(tm)
-		go psi.Get_psi(psi_cpu, psi_mem, psi_io)
-		go bpf_cache.Update(ch)
-		c <- fmt.Sprintf("Page Cache %5v |Pressure Stats cpu:%6s mem:%6s io:%6s | %s",<-ch, <-psi_cpu, <-psi_mem, <-psi_io, <-tm)
+		for _,resource := range resources {
+			go resource.Update(resource.c)
+		}
+		for _,resource := range resources {
+			output += fmt.Sprintf(resource.format, <-resource.c)
+		}
+		c <- output
+		output = ""
 		time.Sleep(time.Second)
 	}
 }
