@@ -9,7 +9,7 @@ import (
 
 type Resource interface {
 	Init()
-	Update(s chan string)
+	Update(s chan<- string)
 	Close()
 }
 
@@ -75,7 +75,7 @@ func loop(d *Display){
 	for _,resource := range resources {
 		resource.Init()
 	}
-	go func(c chan string) {
+	go func(c <-chan string) {
 		debug := false
 		for i := range c {
 			if debug {
