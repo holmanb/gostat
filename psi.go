@@ -97,7 +97,7 @@ func extractInt(s string,r psi_resource)uint64 {
 	return i
 }
 
-func (c *Cpu) Update(s chan string) {
+func (c *Cpu) Update(s chan<- string) {
 	var diff uint64
 	b, err := ioutil.ReadFile(c.path)
 	if err != nil {
@@ -115,7 +115,7 @@ func (c *Cpu) Update(s chan string) {
 	c.some.last_total = curr_total
 	s <- strconv.FormatUint(diff, 10)
 }
-func (m *Mem) Update(c chan string) {
+func (m *Mem) Update(c chan<- string) {
 	var diff uint64
 	b, err := ioutil.ReadFile(m.path)
 	if err != nil {
@@ -132,7 +132,7 @@ func (m *Mem) Update(c chan string) {
 	m.some.last_total = curr_total
 	c <- strconv.FormatUint(diff, 10)
 }
-func (i *Io) Update(c chan string) {
+func (i *Io) Update(c chan<- string) {
 	var diff uint64
 	b, err := ioutil.ReadFile(i.path)
 	if err != nil {

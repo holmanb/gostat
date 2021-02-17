@@ -54,7 +54,7 @@ func (c *CacheHit) Init(){
 
 }
 
-func (c *CacheHit) Update(s chan string){
+func (c *CacheHit) Update(s chan<- string){
 		hits := float64(0)
 		misses := uint64(0)
 		total := uint64(0)
