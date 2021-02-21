@@ -1,8 +1,9 @@
-package bpf
+package main
 
 import (
 	"fmt"
 	"time"
+	//bpf "github.com/holmanb/gostat/bpf"
 )
 
 func main(){
@@ -10,7 +11,7 @@ func main(){
 	s := make(chan string)
 
 	c.Init()
-	if c.debug {
+	if c.Debug {
 		fmt.Printf("%24v%24v%24v%24v%24v%24v%24v%24v\n",
 			"mpa",
 			"mbd",
@@ -23,7 +24,7 @@ func main(){
 	} else {
 		fmt.Printf("%24v%24v%24v\n", "HITS", "MISSES", "RATIO")
 	}
-	c.debug = true
+	c.Debug = true
 	go func(s chan string) {
 		for {
 			c.Update(s)
