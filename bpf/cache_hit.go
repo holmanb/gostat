@@ -1,4 +1,4 @@
-package main
+package bpf
 
 // based on bcc/cachestat.py
 import (
@@ -20,6 +20,8 @@ type CacheHit struct {
 }
 
 func (c *CacheHit) Init(){
+
+	c.addrCache = make(map[string]string)
 	c.counters = map[string]uint64{
 		"add_to_page_cache_lru":0,
 		"mark_buffer_dirty":0,
@@ -90,8 +92,7 @@ func (c *CacheHit) Update(s chan<- string){
 
 func (c *CacheHit) counter_lookup(){
 	it := c.table.Iter()
-	for {
-		it.Next()
+	for ;it.Next();{
 		counterVal := bpf.GetHostByteOrder().Uint64(it.Leaf())
 
 		// fixme: this ugly hack shouldn't be necessary (bug in the lib??)
@@ -100,16 +101,12 @@ func (c *CacheHit) counter_lookup(){
 
 		// keeps local cache to lookup symbol name from symbol address
 		if _, ok := c.addrCache[symbolAddr]; !ok {
-			fmt.Println("looking up cache")
 			kname, err := ksym.Ksym(symbolAddr)
 			if err != nil {
 				panic(err)
 			}
 			c.addrCache[symbolAddr] = kname
-		} else {
-			fmt.Println("not lookup up cache")
 		}
-
 		c.counters[c.addrCache[symbolAddr]] = max(0, counterVal)
 	}
 }

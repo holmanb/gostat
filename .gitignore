@@ -1,3 +1,4 @@
 gostat
 bpf/bpf
 *.sw*
+test/test

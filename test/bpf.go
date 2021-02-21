@@ -3,11 +3,11 @@ package main
 import (
 	"fmt"
 	"time"
-	//bpf "github.com/holmanb/gostat/bpf"
+	bpf "github.com/holmanb/gostat/bpf"
 )
 
 func main(){
-	var c CacheHit
+	var c bpf.CacheHit
 	s := make(chan string)
 
 	c.Init()
