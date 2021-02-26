@@ -92,7 +92,10 @@ func (c *CacheHit) Update(s chan<- string){
 
 func (c *CacheHit) counter_lookup(){
 	it := c.table.Iter()
-	for ;it.Next();{
+	for {
+		if(!it.Next()){
+			break
+		}
 		counterVal := bpf.GetHostByteOrder().Uint64(it.Leaf())
 
 		// fixme: this ugly hack shouldn't be necessary (bug in the lib??)
